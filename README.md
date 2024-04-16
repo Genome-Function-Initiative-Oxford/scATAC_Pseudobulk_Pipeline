@@ -1,4 +1,4 @@
-# Pseudoreplicate Pipeline
+# scATAC Pseudoreplicate Pipeline
 ## About
 This Snakemake workflow is designed to split one or more scATAC-seq BAM files into pseudoreplicates, each containing n cells.
 
