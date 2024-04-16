@@ -1,0 +1,32 @@
+# Set as folder containing BAMs to process
+input_bam_folder: "/project/Wellcome_Discovery/ravzagur/super_PBMC/Liangtis_final_annot/out_cell_type_bam_files_20/"
+
+result_folder: "Results_2000_Cells"
+temp_folder: "Temp_2000_Cells"
+
+# Folders to be created to store results
+barcode_count_folder: "Barcode_Counts"
+barcode_splitter_folder: "Barcode_Split"
+pseudorep_folder: "Pseudoreplicates"
+summary_folder: "Summary"
+
+# Name of cell barcode tag within BAM file (usually this is CB)
+barcode_tag: "CB"
+
+# Number of cells to include in a pseudoreplicate
+pseudo_size: 2000
+# Only BAM files which have enough unique cells to create this minimum number of pseudoreplicates will be split
+# e.g. if "b-cell.bam" has 1241 unique cell barcodes and min_replicates = 3 with pseudo_size = 500, then 
+# this file will be skipped as it has less than 3 * 500 unqiue cells
+min_replicates: 1
+
+# Normalisation method to use in bamCoverage
+norm_method: "None"
+# Bin size to use in bamCoverage
+bin_size: 1
+
+# LanceOtron or MACS2
+peak_caller: "lanceotron"
+
+# Max number of cores to use for steps which can use multi-processing
+subprocess_threads: 2

@@ -1,0 +1,162 @@
+import os
+import glob
+
+# Set default configuration file (can be over-written in snakemake call)
+configfile: "config/config.yaml"
+
+# Extract samples names from BAM files
+input_bam_files = glob.glob(os.path.join(config["input_bam_folder"], "*.bam"))
+# Get names per sample from the BAMs, e.g. "b-cell.bam" would use "b-cell"
+sample_names = [os.path.split(bam_path)[-1].replace(".bam", "") for bam_path in input_bam_files]
+
+# Set name of peak caller
+peak_caller = str(config["peak_caller"]).lower()
+
+if peak_caller == "lanceotron":
+    # Peak BED file name depends on which peak caller is run
+    peak_postfix = "_L-tron"
+else:
+    peak_postfix = ""
+
+def getSplitSamplesPeaks(wildcards):
+    # Call the checkpoint to force it to complete before evaluating and get the directory 
+    # where a sample's split BAM files are created, e.g. "Results/Pseudoreplicates/b-cell/"
+    pseudorep_folder = checkpoints.sinto.get(**wildcards).output["pseudorep_folder"]
+    # Find the names of the pseudoreplicates for the sample
+    pseudorep_wildcards = glob_wildcards(os.path.join(pseudorep_folder, "{pseudorep}.bam")).pseudorep
+    # Create list of pseudoreplicate peaks for the sample
+    # e.g. ["Results/Pseudoreplicates/b-cell/b-cell_1.bed",
+    #       "Results/Pseudoreplicates/b-cell/b-cell_2.bed",
+    #       "Results/Pseudoreplicates/b-cell/b-cell_3.bed"]
+    return expand(os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{pseudorep}" + peak_postfix + ".bed"), pseudorep = pseudorep_wildcards, allow_missing = True)
+
+# Define output files to create
+rule all:
+    input:
+        #barcode_counts = expand(os.path.join(config["result_folder"], config["barcode_count_folder"], "barcode_count_{sample}.txt"), sample = sample_names),
+        cell_barcode_files = expand(os.path.join(config["result_folder"], config["barcode_splitter_folder"], "barcode_split_{sample}.txt"), sample = sample_names),
+        summary_csv = os.path.join(config["result_folder"], config["summary_folder"], "summary.csv")
+
+# Count the number of times each cell barcode occurs in a BAM and save to text file
+rule barcode_occurrence:
+    input:
+        bam_file = os.path.join(config["result_folder"], config["input_bam_folder"], "{sample}.bam")
+    output:
+        barcode_count = os.path.join(config["result_folder"], config["barcode_count_folder"], "barcode_count_{sample}.txt")
+    shell:
+        """
+            echo "Counting barcodes for" {wildcards.sample}
+            samtools view {input.bam_file} | cut -f 12- | tr '\t' '\n' | grep CB:Z: | sed 's/CB:Z://' | sort | uniq -c > {output.barcode_count}
+        """
+
+# For each sample, label its cell barcodes with a pseudoreplicate name
+rule barcode_splitter:
+    input:
+        barcode_count_file = rules.barcode_occurrence.output.barcode_count
+    params:
+        sample_name = "{sample}"
+    output:
+        cell_barcode_file = os.path.join(config["result_folder"], config["barcode_splitter_folder"], "barcode_split_{sample}.txt")
+    script:
+        "scripts/BarcodeSplitter.py"
+
+# Split each BAM file (which has enough cells) to generate pseudoreplicates
+# e.g. "b-cell.bam" into "b-cell_1.bam", "b-cell_2.bam", "b-cell_3.bam"
+checkpoint sinto:
+    input:
+        bam_file = rules.barcode_occurrence.input.bam_file,
+        cell_barcode_file = rules.barcode_splitter.output.cell_barcode_file
+    params:
+        barcode_tag = config["barcode_tag"],
+        pseudo_size = config["pseudo_size"]
+    output:
+        pseudorep_folder = directory(os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}"))
+    threads: config["subprocess_threads"]
+    shell:
+        """
+        echo "Splitting BAMs into pseudoreplicates for" {wildcards.sample}
+        if [[ $(wc -l < {input.cell_barcode_file}) -ge {params.pseudo_size} ]] && [[ $(head -n 1 {input.cell_barcode_file}) != Not* ]]
+        then
+            echo "Running sinto on" {wildcards.sample}
+            sinto filterbarcodes -b {input.bam_file} -c {input.cell_barcode_file} --barcodetag "CB" --nproc {threads} --outdir {output.pseudorep_folder}
+        else
+            echo "Skipping" {wildcards.sample} "as there are not enough cells to create pseudoreplicates"
+            mkdir {output.pseudorep_folder}
+        fi
+        """
+
+# Generate index for each pseudoreplicate BAM
+rule create_index:
+    input:
+        bam_file = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{sample}_{idx}.bam")
+    output:
+        bam_index = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{sample}_{idx}.bam.bai")
+    shell:
+        """
+        echo "Creating index for" {wildcards.sample}
+        samtools index {input.bam_file}
+        """
+
+# Generate bigwig per pseudoreplicate BAM
+rule create_bigwig:
+    input:
+        bam_file = rules.create_index.input["bam_file"],
+        bam_index = rules.create_index.output["bam_index"]
+    params:
+        norm_method = config["norm_method"],
+        bin_size = config["bin_size"]
+    output:
+        bigwig = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{sample}_{idx}.bw")
+    threads: config["subprocess_threads"]
+    shell:
+        """
+        bamCoverage -b {input.bam_file} -o {output.bigwig} -bs {params.bin_size} --normalizeUsing {params.norm_method} --numberOfProcessors {threads}
+        """
+
+rule call_peaks:
+    input:
+        bam_file = rules.create_bigwig.input.bam_file,
+        bam_index = rules.create_bigwig.input.bam_index,
+        bigwig = rules.create_bigwig.output.bigwig
+    params:
+        peak_caller = peak_caller,
+        folder = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}")
+    output:
+        peaks = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{sample}_{idx}" + peak_postfix + ".bed")
+    shell:
+        """
+            if [ "{params.peak_caller}" == "lanceotron" ]
+            then
+                lanceotron callPeaks {input.bigwig} -f {params.folder}
+            else
+                macs2 callpeak --treatment {input.bam_file} --outdir {params.folder} --name {wildcards.sample}
+            fi
+        """
+
+# Create temporary file per sample to ensure that indexes and bigwigs are made
+rule temp_aggregate:
+    input:
+        # Force creation of peaks for each pseudoreplicate by using them as a fake dependency
+        sample_peaks = getSplitSamplesPeaks,
+        # Input cell barcode file to fill in the sample wildcard in case sample_bigwigs is empty
+        cell_barcode_file = rules.barcode_splitter.output.cell_barcode_file
+    output:
+        # Temporary file to create containing names of all pseudoreplicates for the sample
+        finished_file = temp(os.path.join(config["temp_folder"], "finished_processing_{sample}.txt"))
+    shell:
+        """
+        printf "%s\n" {input.sample_peaks} > {output.finished_file}
+        """
+
+# Ensure creation of desired outputs, create summary file and remove temporary files
+rule clean_up:
+    input:
+        # Input the temporary files to force their creation and automatically remove them after this rule completes
+        finished_files = expand(os.path.join(config["temp_folder"], "finished_processing_{sample}.txt"), sample = sample_names)
+    params:
+        file_prefix = "finished_processing_"
+    output:
+        # Create a CSV summarising the pseudoreplicates created for each sample
+        summary_csv = os.path.join(config["result_folder"], config["summary_folder"], "summary.csv")
+    script:
+        "scripts/CleanUp.py"
