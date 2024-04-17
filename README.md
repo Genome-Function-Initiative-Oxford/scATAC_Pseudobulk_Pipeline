@@ -5,7 +5,7 @@ This Snakemake workflow is designed to split one or more scATAC-seq BAM files in
 ## Steps
 1. For each BAM file, count the number of occurences for each unique cell barcode
 2. Assign cell barcodes a label corresponding to a pseudoreplicate to create
-3. Split the BAM file into pseudoreplicate BAM files using sinto to seperate the cell barcodes
+3. Split the BAM file into pseudoreplicate BAM files using [Sinto](https://timoast.github.io/sinto/) to separate the cell barcodes
 4. Generate indexes for the pseudoreplicate BAM files
 5. Generate bigWigs for the pseudoreplicates
 6. Call peaks for the pseudoreplicates
