@@ -1,5 +1,6 @@
 # Set as folder containing BAMs to process
-input_bam_folder: "/project/Wellcome_Discovery/ravzagur/super_PBMC/Liangtis_final_annot/out_cell_type_bam_files_20/"
+# input_bam_folder: "/project/Wellcome_Discovery/ravzagur/super_PBMC/Liangtis_final_annot/out_cell_type_bam_files_20/"
+input_bam_folder: "/ceph/project/Wellcome_Discovery/towilson/Datasets/Human/10k_PBMC_scATAC/Clusters/BAMs"
 
 result_folder: "Results"
 temp_folder: "Temp"
@@ -26,7 +27,7 @@ norm_method: "None"
 bin_size: 1
 
 # LanceOtron or MACS2
-peak_caller: "lanceotron"
+peak_caller: "macs2"
 
 # Max number of cores to use for steps which can use multi-processing
 subprocess_threads: 2

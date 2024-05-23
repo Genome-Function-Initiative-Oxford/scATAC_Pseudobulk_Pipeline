@@ -7,7 +7,7 @@ np.random.seed(1)
 # Get parameters from config file
 pseudo_size = snakemake.config["pseudo_size"]
 min_replicates = snakemake.config["min_replicates"]
-output_folder = snakemake.config["barcode_splitter_folder"]
+output_folder = os.path.join(snakemake.config["result_folder"], snakemake.config["barcode_splitter_folder"])
 
 # Input and output files
 barcode_count_file = snakemake.input["barcode_count_file"]

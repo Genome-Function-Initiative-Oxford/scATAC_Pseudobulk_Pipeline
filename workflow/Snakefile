@@ -1,5 +1,6 @@
 import os
 import glob
+import numpy as np
 
 # Set default configuration file (can be over-written in snakemake call)
 configfile: "config/config.yaml"
@@ -7,7 +8,13 @@ configfile: "config/config.yaml"
 # Extract samples names from BAM files
 input_bam_files = glob.glob(os.path.join(config["input_bam_folder"], "*.bam"))
 # Get names per sample from the BAMs, e.g. "b-cell.bam" would use "b-cell"
-sample_names = [os.path.split(bam_path)[-1].replace(".bam", "") for bam_path in input_bam_files]
+sample_names = np.array([os.path.split(bam_path)[-1].replace(".bam", "") for bam_path in input_bam_files])
+
+# Check if any index files are missing
+indexes_exist = np.array([os.path.isfile(os.path.join(config["input_bam_folder"], sample + ".bam.bai")) for sample in sample_names])
+
+if not np.all(indexes_exist):
+    print("The following sample(s) are missing BAM index files:", ", ".join(sample_names[np.where(~indexes_exist)]))
 
 # Set name of peak caller
 peak_caller = str(config["peak_caller"]).lower()
@@ -16,7 +23,8 @@ if peak_caller == "lanceotron":
     # Peak BED file name depends on which peak caller is run
     peak_postfix = "_L-tron"
 else:
-    peak_postfix = ""
+    peak_caller = "macs2"
+    peak_postfix = "_summits"
 
 def getSplitSamplesPeaks(wildcards):
     # Call the checkpoint to force it to complete before evaluating and get the directory 
@@ -60,11 +68,22 @@ rule barcode_splitter:
     script:
         "scripts/BarcodeSplitter.py"
 
+rule index_BAM:
+    input:
+        bam_file = rules.barcode_occurrence.input.bam_file,
+    output:
+        bai_file = os.path.join(config["result_folder"], config["input_bam_folder"], "{sample}.bam.bai")
+    shell:
+        """
+        samtools index {input.bam_file}
+        """
+
 # Split each BAM file (which has enough cells) to generate pseudoreplicates
 # e.g. "b-cell.bam" into "b-cell_1.bam", "b-cell_2.bam", "b-cell_3.bam"
 checkpoint sinto:
     input:
         bam_file = rules.barcode_occurrence.input.bam_file,
+        bai_file = os.path.join(config["result_folder"], config["input_bam_folder"], "{sample}.bam.bai"),
         cell_barcode_file = rules.barcode_splitter.output.cell_barcode_file
     params:
         barcode_tag = config["barcode_tag"],
@@ -122,14 +141,17 @@ rule call_peaks:
         peak_caller = peak_caller,
         folder = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}")
     output:
-        peaks = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{sample}_{idx}" + peak_postfix + ".bed")
+        peaks = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{sample}_{idx}" + peak_postfix + ".bed"),
+        r_model = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{sample}_{idx}_model.r") if peak_caller == "macs2" else [],
+        narrow_peaks = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{sample}_{idx}_peaks.narrowPeak") if peak_caller == "macs2" else [],
+        xls_peaks = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{sample}_{idx}_peaks.xls") if peak_caller == "macs2" else []
     shell:
         """
             if [ "{params.peak_caller}" == "lanceotron" ]
             then
                 lanceotron callPeaks {input.bigwig} -f {params.folder}
             else
-                macs2 callpeak --treatment {input.bam_file} --outdir {params.folder} --name {wildcards.sample}
+                macs2 callpeak --treatment {input.bam_file} --outdir {params.folder} --name {wildcards.sample}_{wildcards.idx}
             fi
         """
 
