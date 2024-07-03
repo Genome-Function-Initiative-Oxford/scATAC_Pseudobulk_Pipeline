@@ -28,4 +28,8 @@ The pipeline can either be run manually via command line or scheduled to run on 
 `snakemake --cores n`
 
 ### Running on a Cluster via Slurm
-The pipeline can be scheduled to run on a cluster using the file `submit.sh`
+The pipeline can be scheduled to run on a cluster using the file `submit.sh`, e.g.
+
+```
+sbatch submit.sh
+```
