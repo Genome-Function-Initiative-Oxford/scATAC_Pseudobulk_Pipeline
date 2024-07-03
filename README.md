@@ -11,6 +11,9 @@ This Snakemake workflow is designed to split one or more scATAC-seq BAM files in
 6. Call peaks for the pseudoreplicates
 7. Create a metadata file summarising the number of pseudoreplicates created from each input BAM file
 
+## Configuration
+To set the data and the parameters, edit `config.yaml`.
+
 ## Running the Pipeline
 The pipeline can either be run manually via command line or scheduled to run on a cluster via Slurm.
 
