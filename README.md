@@ -25,7 +25,7 @@ The pipeline can either be run manually via command line or scheduled to run on 
 2. Activate conda environment with dependencies
 3. Run the workflow via the command below, setting `n` as the number of processors to use
 
-`snakemake --cores n`
+`snakemake --cores n --configfile=config/config.yaml`
 
 ### Running on a Cluster via Slurm
 The pipeline can be scheduled to run on a cluster using the file `submit.sh`, e.g.
