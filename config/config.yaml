@@ -1,19 +1,34 @@
+### Mandatory Input Files ###
 # Set as folder containing BAMs to process
 # input_bam_folder: "/project/Wellcome_Discovery/ravzagur/super_PBMC/Liangtis_final_annot/out_cell_type_bam_files_20/"
-input_bam_folder: "/ceph/project/Wellcome_Discovery/towilson/Datasets/Human/10k_PBMC_scATAC/Clusters/BAMs"
+# input_bam_folder: "/ceph/project/Wellcome_Discovery/towilson/Datasets/Human/10k_PBMC_scATAC/Clusters/BAMs"
+# input_bam_folder: "/ceph/project/Wellcome_Discovery/towilson/Datasets/Human/Julia_Erythroid_Donor_2_Day_10_scATAC/Clusters/BAMs"
+# input_bam_folder: "/ceph/project/Wellcome_Discovery/towilson/Datasets/Human/Multiome_Erythroid_10X/Clusters/BAMs"
+# input_bam_folder: "/ceph/project/Wellcome_Discovery/towilson/Datasets/Human/Erythroid_Differentiation_Donor_2_scATAC/hg38/Original_Clusters/Clusters/BAMs"
+input_bam_folder: "/ceph/project/Wellcome_Discovery/towilson/Datasets/Human/Julia_Erythroid_Donor_2_Day_10_scATAC/hg38/Clusters/BAMs"
 
-result_folder: "Results"
+### Optional Input Files ###
+# Folder containing text files which pre-determine the cell barcodes to use in each sample's pseudoreplicates
+# e.g. "path/to/barcodes/barcode_split_b-cell.txt" must contain tab separated cell barcodes and pseudoreplicate IDs 
+# (no header or index) to split file "b-cell.bam"
+#barcode_preset_folder: "/ceph/project/Wellcome_Discovery/towilson/Datasets/Human/Julia_Erythroid_Donor_2_Day_10_scATAC/hg38/Clusters/Barcodes"
+barcode_preset_folder: None
+
+### Output Folders ###
+# Folders to create which results and temporary files will be saved to
+result_folder: "Results_500"
 temp_folder: "Temp"
-
-# Folders to be created to store results
+# Sub-folders to be created to store each result type
 barcode_count_folder: "Barcode_Counts"
-barcode_splitter_folder: "Barcode_Split"
+barcode_split_folder: "Barcode_Split"
 pseudorep_folder: "Pseudoreplicates"
 summary_folder: "Summary"
 
-# Name of cell barcode tag within BAM file (usually this is CB)
+### Splitting into Pseudoreplicates ###
+# Seed for random number generation
+random_seed: 1
+# Set name of cell barcode tag within BAM file (usually this is CB)
 barcode_tag: "CB"
-
 # Number of cells to include in a pseudoreplicate
 pseudo_size: 500
 # Only BAM files which have enough unique cells to create this minimum number of pseudoreplicates will be split
@@ -21,13 +36,14 @@ pseudo_size: 500
 # this file will be skipped as it has less than 3 * 500 unqiue cells
 min_replicates: 1
 
+### Normalisation Parameters ###
 # Normalisation method to use in bamCoverage
 norm_method: "None"
 # Bin size to use in bamCoverage
 bin_size: 1
-
 # LanceOtron or MACS2
 peak_caller: "macs2"
 
+### Parallalisation ###
 # Max number of cores to use for steps which can use multi-processing
-subprocess_threads: 2
+subprocess_threads: 4

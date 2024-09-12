@@ -2,18 +2,19 @@ import pandas as pd
 import os
 import numpy as np
 
-np.random.seed(1)
-
 # Get parameters from config file
+random_seed = snakemake.config["random_seed"]
 pseudo_size = snakemake.config["pseudo_size"]
 min_replicates = snakemake.config["min_replicates"]
-output_folder = os.path.join(snakemake.config["result_folder"], snakemake.config["barcode_splitter_folder"])
-
+output_folder = os.path.join(snakemake.config["result_folder"], snakemake.config["barcode_split_folder"])
 # Input and output files
 barcode_count_file = snakemake.input["barcode_count_file"]
 cell_barcode_file = snakemake.output["cell_barcode_file"]
-
+# Get name wildcard
 sample_name = snakemake.params["sample_name"]
+
+# Seed random number generator for reproducibility
+np.random.seed(random_seed)
 
 # Create output folder if not yet created
 if not os.path.exists(output_folder):
@@ -57,4 +58,4 @@ else:
     with open(cell_barcode_file, "w") as output_file:
         # Write message to file
         output_file.write("Found " + str(len(barcodes)) + " cell barcodes, which is not enough to create " +
-                          str(min_replicates) + " of size " + str(pseudo_size) + " for " + sample_name)
+                          str(min_replicates) + " or more pseudoreplicates of size " + str(pseudo_size) + " for " + sample_name)
