@@ -1,22 +1,16 @@
 ### Mandatory Input Files ###
 # Set as folder containing BAMs to process
-# input_bam_folder: "/project/Wellcome_Discovery/ravzagur/super_PBMC/Liangtis_final_annot/out_cell_type_bam_files_20/"
-# input_bam_folder: "/ceph/project/Wellcome_Discovery/towilson/Datasets/Human/10k_PBMC_scATAC/Clusters/BAMs"
-# input_bam_folder: "/ceph/project/Wellcome_Discovery/towilson/Datasets/Human/Julia_Erythroid_Donor_2_Day_10_scATAC/Clusters/BAMs"
-# input_bam_folder: "/ceph/project/Wellcome_Discovery/towilson/Datasets/Human/Multiome_Erythroid_10X/Clusters/BAMs"
-# input_bam_folder: "/ceph/project/Wellcome_Discovery/towilson/Datasets/Human/Erythroid_Differentiation_Donor_2_scATAC/hg38/Original_Clusters/Clusters/BAMs"
-input_bam_folder: "/ceph/project/Wellcome_Discovery/towilson/Datasets/Human/Julia_Erythroid_Donor_2_Day_10_scATAC/hg38/Clusters/BAMs"
+input_bam_folder: "/path/to/folder"
 
 ### Optional Input Files ###
 # Folder containing text files which pre-determine the cell barcodes to use in each sample's pseudoreplicates
 # e.g. "path/to/barcodes/barcode_split_b-cell.txt" must contain tab separated cell barcodes and pseudoreplicate IDs 
 # (no header or index) to split file "b-cell.bam"
-#barcode_preset_folder: "/ceph/project/Wellcome_Discovery/towilson/Datasets/Human/Julia_Erythroid_Donor_2_Day_10_scATAC/hg38/Clusters/Barcodes"
 barcode_preset_folder: None
 
 ### Output Folders ###
 # Folders to create which results and temporary files will be saved to
-result_folder: "Results_500"
+result_folder: "Results"
 temp_folder: "Temp"
 # Sub-folders to be created to store each result type
 barcode_count_folder: "Barcode_Counts"
