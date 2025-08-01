@@ -35,7 +35,8 @@ if (len(barcode_preset_folder) > 0) and (barcode_preset_folder.lower() != "none"
     missing_barcodes = np.setdiff1d(sample_names, barcode_samples)
 
     if len(missing_barcodes) > 0:
-        raise ValueError("The following samples are missing preset barcode files: " + ", ".join(missing_barcodes))
+        raise ValueError("The following samples are missing preset barcode files: " + ", ".join(missing_barcodes) + ".\n" +
+                         "These need to be named as barcode_split_sample.txt")
 
     print("Using preset barcode files for all samples")
     use_preset_barcodes = True
@@ -214,7 +215,7 @@ rule temp_aggregate:
         cell_barcode_file = os.path.join(barcode_folder, "barcode_split_{sample}.txt")
     output:
         # Temporary file to create containing names of all pseudoreplicates for the sample
-        finished_file = temp(os.path.join(config["temp_folder"], "finished_processing_{sample}.txt"))
+        finished_file = temp(os.path.join(config["result_folder"], config["temp_folder"], "finished_processing_{sample}.txt"))
     shell:
         """
         printf "%s\n" {input.sample_results} > {output.finished_file}
@@ -224,7 +225,7 @@ rule temp_aggregate:
 rule clean_up:
     input:
         # Input the temporary files to force their creation and automatically remove them after this rule completes
-        finished_files = expand(os.path.join(config["temp_folder"], "finished_processing_{sample}.txt"), sample = sample_names)
+        finished_files = expand(os.path.join(config["result_folder"], config["temp_folder"], "finished_processing_{sample}.txt"), sample = sample_names)
     params:
         file_prefix = "finished_processing_"
     output:
