@@ -12,9 +12,9 @@ This Snakemake workflow is designed to split one or more scATAC-seq BAM files in
 7. Create a metadata file summarising the number of pseudobulks created from each input BAM file
 
 ## Running the Pipeline
-1. Set up the pseudobulk conda enviroment
+1. Set up the pseudobulk conda enviroment using [workflow/envs/pseudobulk_env.yaml](https://github.com/Genome-Function-Initiative-Oxford/scATAC_Pseudobulk_Pipeline/blob/main/workflow/envs/pseudobulk_env.yaml)
 
-   `conda env create --name pseudobulk --file=pseudobulk_environment.yml`
+   `conda env create --name pseudobulk --file=pseudobulk_env.yml`
    
 3. Edit config/config.yaml to set the data and parameters
 4. Then the pipeline can either be run manually via command line or scheduled to run on a cluster via Slurm.
