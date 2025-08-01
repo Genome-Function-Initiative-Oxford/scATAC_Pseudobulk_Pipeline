@@ -63,7 +63,7 @@ elif peak_caller == "lanceotron":
     # Peak BED file name depends on which peak caller is run
     peak_postfix = "_L-tron"
 else:
-    peak_caller = "macs2"
+    peak_caller = "macs3"
     peak_postfix = "_summits"
 
 def getSplitSampleResults(wildcards):
@@ -192,16 +192,16 @@ rule call_peaks:
         folder = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}")
     output:
         peaks = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{pseudorep}" + peak_postfix + ".bed"),
-        r_model = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{pseudorep}_model.r") if peak_caller == "macs2" else [],
-        narrow_peaks = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{pseudorep}_peaks.narrowPeak") if peak_caller == "macs2" else [],
-        xls_peaks = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{pseudorep}_peaks.xls") if peak_caller == "macs2" else []
+        r_model = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{pseudorep}_model.r") if peak_caller == "macs3" else [],
+        narrow_peaks = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{pseudorep}_peaks.narrowPeak") if peak_caller == "macs3" else [],
+        xls_peaks = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{pseudorep}_peaks.xls") if peak_caller == "macs3" else []
     shell:
         """
             if ["{params.peak_caller}" == "lanceotron"]
             then
                 lanceotron callPeaks {input.bigwig} -f {params.folder}
             else
-                macs2 callpeak --treatment {input.bam_file} --outdir {params.folder} --name {wildcards.pseudorep}
+                macs3 callpeak --treatment {input.bam_file} --outdir {params.folder} --name {wildcards.pseudorep}
             fi
         """
 
