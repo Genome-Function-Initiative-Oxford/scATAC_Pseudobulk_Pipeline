@@ -1,6 +1,5 @@
 import os
 import pandas as pd
-import numpy
 
 # Get parameters from config file
 pseudo_size = snakemake.config["pseudo_size"]
