@@ -35,8 +35,8 @@ min_replicates: 1
 norm_method: "None"
 # Bin size to use in bamCoverage
 bin_size: 1
-# LanceOtron or MACS2
-peak_caller: "macs2"
+# LanceOtron, MACS3 or None
+peak_caller: "macs3"
 
 ### Parallalisation ###
 # Max number of cores to use for steps which can use multi-processing
