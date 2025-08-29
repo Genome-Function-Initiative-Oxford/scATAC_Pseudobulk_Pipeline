@@ -37,3 +37,5 @@ BAMs can be separated using a custom barcode_split file. For this, barcodes must
 ```
 samtools view yourfile.bam | awk '{for(i=12;i<=NF;i++){if($i ~ /^CB:Z:/){print $i; exit}}}'
 ```
+
+This will print the first cell barcode, e.g. `CB:Z:GCGCTTGCAACAGCCT-1`. If this does not print anything, the BAM may not contain cell barcodes. 
