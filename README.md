@@ -31,3 +31,9 @@ This Snakemake workflow is designed to split one or more scATAC-seq BAM files in
 
 ### Running on a Cluster via Slurm
 The pipeline can be scheduled to run on a cluster using the file `submit.sh`
+
+### Custom Barcodes
+BAMs can be separated using a custom barcode_split file. For this, barcodes must match those within the BAM. One way to check the format of cell barcodes within a BAM is to use samtools, e.g.
+```
+samtools view yourfile.bam | awk '{for(i=12;i<=NF;i++){if($i ~ /^CB:Z:/){print $i; exit}}}'
+```
