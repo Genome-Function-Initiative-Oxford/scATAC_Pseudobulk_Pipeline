@@ -16,8 +16,13 @@ else:
 
 # Get names per sample from the BAMs, e.g. "b-cell.bam" would use "b-cell"
 sample_names = np.array([os.path.split(bam_path)[-1].replace(".bam", "") for bam_path in input_bam_files])
-# Check if barcode split files are already provided per sample
-barcode_preset_folder = str(config["barcode_preset_folder"])
+
+try:
+    # Check if barcode split files are already provided per sample
+    barcode_preset_folder = str(config["barcode_preset_folder"])
+except:
+    print("Warning: \"barcode_preset_folder\" was not found in config file")
+    barcode_preset_folder = ""
 
 if (len(barcode_preset_folder) > 0) and (barcode_preset_folder.lower() != "none"):
     if not os.path.exists(barcode_preset_folder):
@@ -41,17 +46,54 @@ if (len(barcode_preset_folder) > 0) and (barcode_preset_folder.lower() != "none"
     print("Using preset barcode files for all samples")
     use_preset_barcodes = True
     barcode_folder = barcode_preset_folder
+
+    # Set the minimum number of cells allowed to create a BAM
+    min_cells = config["min_cells"]
+
+    try:
+        min_cells = max(1, int(min_cells))
+    except:
+        raise ValueError("min_cells must be an integer >= 1")
+
+    if min_cells > 1:
+        print(f"Set to ensure that each pseudobulk has at least {min_cells} cells")
+
 else:
     use_preset_barcodes = False
     barcode_folder = os.path.join(config["result_folder"], config["barcode_split_folder"])
+
+    pseudo_size = config["pseudo_size"]
+
+    try:
+        pseudo_size = max(1, int(pseudo_size))
+    except:
+        raise ValueError("pseudo_size must be an integer >= 1")
+
+    print(f"Set to create pseudobulks with {pseudo_size} cells")
+
+    # Set cell limit to match the pseudobulk size
+    min_cells = pseudo_size
 
 # Check if any index files are missing
 indexes_exist = np.array([os.path.isfile(os.path.join(config["input_bam_folder"], sample + ".bam.bai")) for sample in sample_names])
 use_preset_indexes = True
 
 if not np.all(indexes_exist):
+    # Indexes need to be created
     use_preset_indexes = False
-    print("The following sample(s) are missing BAM index files:", ", ".join(sample_names[np.where(~indexes_exist)]))
+    # Check if any made in previous run
+    indexes_made = np.array([os.path.isfile(os.path.join(config["result_folder"], config["sorted_bam_folder"], sample + ".bam.bai")) for sample in sample_names])
+
+    if not np.all(indexes_made):
+        print("The following sample(s) are missing BAM index files:", ", ".join(sample_names[np.where(~indexes_made)]))
+
+# Set folder with BAMs to create pseudobulks from
+if use_preset_indexes:
+    # Use original BAMs
+    bam_folder = config["input_bam_folder"]
+else:
+    # Use sorted BAMs
+    bam_folder = config["sorted_bam_folder"]
 
 # Set name of peak caller
 peak_caller = str(config["peak_caller"]).lower()
@@ -69,27 +111,27 @@ else:
 
 def getSplitSampleResults(wildcards):
     # Call the checkpoint to force it to complete before evaluating and get the directory 
-    # where a sample's split BAM files are created, e.g. "Results/Pseudoreplicates/b-cell/"
-    pseudorep_folder = checkpoints.sinto.get(**wildcards).output["pseudorep_folder"]
-    # Find the names of the pseudoreplicates for the sample
-    pseudorep_wildcards = glob_wildcards(os.path.join(pseudorep_folder, "{pseudorep}.bam")).pseudorep
-    # Create list of pseudoreplicate bigWigs or peaks for the sample
-    # e.g. ["Results/Pseudoreplicates/b-cell/b-cell_1.bed",
-    #       "Results/Pseudoreplicates/b-cell/b-cell_2.bed",
-    #       "Results/Pseudoreplicates/b-cell/b-cell_3.bed"]
+    # where a sample's split BAM files are created, e.g. "Results/pseudobulks/b-cell/"
+    pseudobulk_folder = checkpoints.sinto.get(**wildcards).output["pseudobulk_folder"]
+    # Find the names of the pseudobulks for the sample
+    pseudobulk_wildcards = glob_wildcards(os.path.join(pseudobulk_folder, "{pseudobulk}.bam")).pseudobulk
+    # Create list of pseudobulk bigWigs or peaks for the sample
+    # e.g. ["Results/pseudobulks/b-cell/b-cell_1.bed",
+    #       "Results/pseudobulks/b-cell/b-cell_2.bed",
+    #       "Results/pseudobulks/b-cell/b-cell_3.bed"]
     if peak_caller is None:
         # Use bigWigs if not using peak calling
-        pseudorep_results = expand(os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{pseudorep}.bw"), pseudorep = pseudorep_wildcards, allow_missing = True)
+        pseudobulk_results = expand(os.path.join(config["result_folder"], config["pseudobulk_folder"], "{sample}", "{pseudobulk}.bw"), pseudobulk = pseudobulk_wildcards, allow_missing = True)
     else:
         # Use peak calls if they should be created
-        pseudorep_results = expand(os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{pseudorep}" + peak_postfix + ".bed"), pseudorep = pseudorep_wildcards, allow_missing = True)
+        pseudobulk_results = expand(os.path.join(config["result_folder"], config["pseudobulk_folder"], "{sample}", "{pseudobulk}" + peak_postfix + ".bed"), pseudobulk = pseudobulk_wildcards, allow_missing = True)
     
-    return pseudorep_results
+    return pseudobulk_results
 
 # Define output files to create
 rule all:
     input:
-        #cell_barcode_files = expand(os.path.join(barcode_folder, "barcode_split_{sample}.txt"), sample = sample_names),
+        #cell_barcode_files = expand(os.path.join(barcode_folder, "barcode_split_{sample}.txt"), sample = sample_names)
         summary_csv = os.path.join(config["result_folder"], config["summary_folder"], "summary.csv")
 
 # Check to prevent user inputted barcode files being overwritten
@@ -97,7 +139,7 @@ if not use_preset_barcodes:
     # Count the number of times each cell barcode occurs in a BAM and save to text file
     rule barcode_occurrence:
         input:
-            bam_file = os.path.join(config["result_folder"], config["input_bam_folder"], "{sample}.bam")
+            bam_file = os.path.join(config["result_folder"], bam_folder, "{sample}.bam")
         output:
             barcode_count = os.path.join(config["result_folder"], config["barcode_count_folder"], "barcode_count_{sample}.txt")
         shell:
@@ -106,7 +148,7 @@ if not use_preset_barcodes:
                 samtools view {input.bam_file} | cut -f 12- | tr '\t' '\n' | grep CB:Z: | sed 's/CB:Z://' | sort | uniq -c > {output.barcode_count}
             """
 
-    # For each sample, label its cell barcodes with a pseudoreplicate name
+    # For each sample, label its cell barcodes with a pseudobulk name
     rule barcode_splitter:
         input:
             barcode_count_file = rules.barcode_occurrence.output.barcode_count
@@ -118,56 +160,66 @@ if not use_preset_barcodes:
             "scripts/BarcodeSplitter.py"
 
 if not use_preset_indexes:
+    rule sort_BAM:
+        input:
+            unsorted_bam_file = os.path.join(config["result_folder"], config["input_bam_folder"], "{sample}.bam")
+        output:
+            sorted_bam_file = os.path.join(config["result_folder"], config["sorted_bam_folder"], "{sample}.bam")
+        shell:
+            """
+            samtools sort -o {output.sorted_bam_file} {input.unsorted_bam_file}
+            """
+
     # Create index for each input BAM
     rule index_BAM:
         input:
-            bam_file = os.path.join(config["result_folder"], config["input_bam_folder"], "{sample}.bam")
+            bam_file = os.path.join(config["result_folder"], config["sorted_bam_folder"], "{sample}.bam")
         output:
-            bai_file = os.path.join(config["result_folder"], config["input_bam_folder"], "{sample}.bam.bai")
+            bai_file = os.path.join(config["result_folder"], config["sorted_bam_folder"], "{sample}.bam.bai")
         shell:
             """
             samtools index {input.bam_file}
             """
 
-# Split each BAM file (which has enough cells) to generate pseudoreplicates
+# Split each BAM file (which has enough cells) to generate pseudobulks
 # e.g. "b-cell.bam" into "b-cell_1.bam", "b-cell_2.bam", "b-cell_3.bam"
 checkpoint sinto:
     input:
-        bam_file = os.path.join(config["result_folder"], config["input_bam_folder"], "{sample}.bam"),
-        bai_file = os.path.join(config["result_folder"], config["input_bam_folder"], "{sample}.bam.bai"),
+        bam_file = os.path.join(config["result_folder"], bam_folder, "{sample}.bam"),
+        bai_file = os.path.join(config["result_folder"], bam_folder, "{sample}.bam.bai"),
         cell_barcode_file = os.path.join(barcode_folder, "barcode_split_{sample}.txt")
     params:
         barcode_tag = config["barcode_tag"],
-        pseudo_size = config["pseudo_size"]
+        min_cells = min_cells
     output:
-        pseudorep_folder = directory(os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}"))
+        pseudobulk_folder = directory(os.path.join(config["result_folder"], config["pseudobulk_folder"], "{sample}"))
     threads: config["subprocess_threads"]
     shell:
         """
-        echo "Splitting BAMs into pseudoreplicates for" {wildcards.sample}
-        if [[ $(wc -l < {input.cell_barcode_file}) -ge {params.pseudo_size} ]] && [[ $(head -n 1 {input.cell_barcode_file}) != Not* ]]
+        echo "Splitting BAMs into pseudobulks for" {wildcards.sample}
+        if [[ $(wc -l < {input.cell_barcode_file}) -ge {params.min_cells} ]] && [[ $(head -n 1 {input.cell_barcode_file}) != Not* ]]
         then
             echo "Running sinto on" {wildcards.sample}
-            sinto filterbarcodes -b {input.bam_file} -c {input.cell_barcode_file} --barcodetag "CB" --nproc {threads} --outdir {output.pseudorep_folder}
+            sinto filterbarcodes -b {input.bam_file} -c {input.cell_barcode_file} --barcodetag "CB" --nproc {threads} --outdir {output.pseudobulk_folder}
         else
-            echo "Skipping" {wildcards.sample} "as there are not enough cells to create pseudoreplicates"
-            mkdir {output.pseudorep_folder}
+            echo "Skipping" {wildcards.sample} "as there are not enough cells to create pseudobulks"
+            mkdir {output.pseudobulk_folder}
         fi
         """
 
-# Generate index for each pseudoreplicate BAM
+# Generate index for each pseudobulk BAM
 rule create_index:
     input:
-        bam_file = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{pseudorep}.bam")
+        bam_file = os.path.join(config["result_folder"], config["pseudobulk_folder"], "{sample}", "{pseudobulk}.bam")
     output:
-        bam_index = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{pseudorep}.bam.bai")
+        bam_index = os.path.join(config["result_folder"], config["pseudobulk_folder"], "{sample}", "{pseudobulk}.bam.bai")
     shell:
         """
         echo "Creating index for" {wildcards.sample}
         samtools index {input.bam_file}
         """
 
-# Generate bigWig per pseudoreplicate BAM
+# Generate bigWig per pseudobulk BAM
 rule create_bigwig:
     input:
         bam_file = rules.create_index.input["bam_file"],
@@ -176,7 +228,7 @@ rule create_bigwig:
         norm_method = config["norm_method"],
         bin_size = config["bin_size"]
     output:
-        bigwig = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{pseudorep}.bw")
+        bigwig = os.path.join(config["result_folder"], config["pseudobulk_folder"], "{sample}", "{pseudobulk}.bw")
     threads: config["subprocess_threads"]
     shell:
         """
@@ -190,31 +242,31 @@ rule call_peaks:
         bigwig = rules.create_bigwig.output.bigwig
     params:
         peak_caller = peak_caller,
-        folder = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}")
+        folder = os.path.join(config["result_folder"], config["pseudobulk_folder"], "{sample}")
     output:
-        peaks = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{pseudorep}" + peak_postfix + ".bed"),
-        r_model = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{pseudorep}_model.r") if peak_caller == "macs3" else [],
-        narrow_peaks = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{pseudorep}_peaks.narrowPeak") if peak_caller == "macs3" else [],
-        xls_peaks = os.path.join(config["result_folder"], config["pseudorep_folder"], "{sample}", "{pseudorep}_peaks.xls") if peak_caller == "macs3" else []
+        peaks = os.path.join(config["result_folder"], config["pseudobulk_folder"], "{sample}", "{pseudobulk}" + peak_postfix + ".bed"),
+        r_model = os.path.join(config["result_folder"], config["pseudobulk_folder"], "{sample}", "{pseudobulk}_model.r") if peak_caller == "macs3" else [],
+        narrow_peaks = os.path.join(config["result_folder"], config["pseudobulk_folder"], "{sample}", "{pseudobulk}_peaks.narrowPeak") if peak_caller == "macs3" else [],
+        xls_peaks = os.path.join(config["result_folder"], config["pseudobulk_folder"], "{sample}", "{pseudobulk}_peaks.xls") if peak_caller == "macs3" else []
     shell:
         """
             if ["{params.peak_caller}" == "lanceotron"]
             then
                 lanceotron callPeaks {input.bigwig} -f {params.folder}
             else
-                macs3 callpeak --treatment {input.bam_file} --outdir {params.folder} --name {wildcards.pseudorep}
+                macs3 callpeak --treatment {input.bam_file} --outdir {params.folder} --name {wildcards.pseudobulk}
             fi
         """
 
 # Create temporary file per sample to ensure that indexes and bigwigs are made
 rule temp_aggregate:
     input:
-        # Force creation of bigWigs and/or peaks for each pseudoreplicate by using them as a fake dependency
+        # Force creation of bigWigs and/or peaks for each pseudobulk by using them as a fake dependency
         sample_results = getSplitSampleResults,
         # Input cell barcode file to fill in the sample wildcard in case sample_results is empty
         cell_barcode_file = os.path.join(barcode_folder, "barcode_split_{sample}.txt")
     output:
-        # Temporary file to create containing names of all pseudoreplicates for the sample
+        # Temporary file to create containing names of all pseudobulks for the sample
         finished_file = temp(os.path.join(config["result_folder"], config["temp_folder"], "finished_processing_{sample}.txt"))
     shell:
         """
@@ -225,11 +277,14 @@ rule temp_aggregate:
 rule clean_up:
     input:
         # Input the temporary files to force their creation and automatically remove them after this rule completes
-        finished_files = expand(os.path.join(config["result_folder"], config["temp_folder"], "finished_processing_{sample}.txt"), sample = sample_names)
+        finished_files = expand(os.path.join(config["result_folder"], config["temp_folder"], "finished_processing_{sample}.txt"), sample = sample_names),
     params:
-        file_prefix = "finished_processing_"
+        barcode_folder = barcode_folder,
+        file_prefix = "finished_processing_",
+        use_preset_barcodes = use_preset_barcodes,
+        min_cells = min_cells,
     output:
-        # Create a CSV summarising the pseudoreplicates created for each sample
+        # Create a CSV summarising the pseudobulks created for each sample
         summary_csv = os.path.join(config["result_folder"], config["summary_folder"], "summary.csv")
     script:
         "scripts/CleanUp.py"
