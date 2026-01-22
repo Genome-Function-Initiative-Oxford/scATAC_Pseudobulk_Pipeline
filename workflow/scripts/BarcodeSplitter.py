@@ -17,8 +17,7 @@ sample_name = snakemake.params["sample_name"]
 np.random.seed(random_seed)
 
 # Create output folder if not yet created
-if not os.path.exists(output_folder):
-    os.makedirs(output_folder)
+os.makedirs(output_folder, exist_ok = True)
 
 try:
     # Open the cell barcode read counts as a DataFrame
@@ -41,7 +40,7 @@ if len(barcodes) == 0:
 n_pseudo_replicates = len(barcodes) // pseudo_size
 
 if n_pseudo_replicates >= min_replicates:
-    print("Splitting barcodes to create", n_pseudo_replicates, "pseudoreplicate(s) of size", 
+    print("Splitting barcodes to create", n_pseudo_replicates, "pseudobulk(s) of size", 
           pseudo_size, "for", sample_name)
     # Randomly order barcodes
     np.random.shuffle(barcodes)
@@ -51,11 +50,11 @@ if n_pseudo_replicates >= min_replicates:
                              "Group": np.repeat(np.array([sample_name + "_" + str(i + 1) for 
                                                           i in range(n_pseudo_replicates)]), pseudo_size)})
     # Save to file
-    group_df.to_csv(cell_barcode_file, sep = '\t', index = False, header = False)
+    group_df.to_csv(cell_barcode_file, sep = "\t", index = False, header = False)
 
 else:
-    print("Not enough cells found to create", min_replicates, "or more pseudoreplicates for", sample_name)
+    print("Not enough cells found to create", min_replicates, "or more pseudobulks for", sample_name)
     with open(cell_barcode_file, "w") as output_file:
         # Write message to file
         output_file.write("Found " + str(len(barcodes)) + " cell barcodes, which is not enough to create " +
-                          str(min_replicates) + " or more pseudoreplicates of size " + str(pseudo_size) + " for " + sample_name)
+                          str(min_replicates) + " or more pseudobulks of size " + str(pseudo_size) + " for " + sample_name)
